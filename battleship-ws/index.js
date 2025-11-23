@@ -14,28 +14,37 @@ const wss = new WebSocket.Server({ server });
 // public 配信
 app.use(express.static(path.join(__dirname, "public")));
 
-// 最大2人
+// 接続中プレイヤー
 let players = [];
 
+// 接続時
 wss.on("connection", (ws) => {
   console.log("Client connected");
 
-  // 2人以上は入れない
-  if (players.length >= 2) {
+  // 新規プレイヤー登録（最大2人）
+  if (players.length < 2) {
+    ws.playerId = players.length + 1; 
+    players.push(ws);
+
+    // クライアントへ自分のIDを送る
+    ws.send(JSON.stringify({ type: "playerId", playerId: ws.playerId }));
+  } else {
+    // 3人目以降は切断
     ws.send(JSON.stringify({ type: "full" }));
     ws.close();
     return;
   }
 
-  players.push(ws);
+  // プレイヤーが2人揃ったら開始通知
+  if (players.length === 2) {
+    players.forEach((p) => {
+      if (p.readyState === WebSocket.OPEN) {
+        p.send(JSON.stringify({ type: "start" }));
+      }
+    });
+  }
 
-  // 現在の人数を通知（クライアント側の接続判定に使う）
-  players.forEach((p) => {
-    if (p.readyState === WebSocket.OPEN) {
-      p.send(JSON.stringify({ type: "count", count: players.length }));
-    }
-  });
-
+  // メッセージ転送
   ws.on("message", (msg) => {
     players.forEach((p) => {
       if (p !== ws && p.readyState === WebSocket.OPEN) {
@@ -44,19 +53,12 @@ wss.on("connection", (ws) => {
     });
   });
 
+  // 切断時
   ws.on("close", () => {
-    console.log("Client disconnected");
     players = players.filter((p) => p !== ws);
-
-    // 人数更新を通知
-    players.forEach((p) => {
-      if (p.readyState === WebSocket.OPEN) {
-        p.send(JSON.stringify({ type: "count", count: players.length }));
-      }
-    });
   });
 });
 
-// Render / Codesandbox 用ポート
+// Port設定
 const PORT = process.env.PORT || 8080;
 server.listen(PORT, () => console.log("Server running on " + PORT));
