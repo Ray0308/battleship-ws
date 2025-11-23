@@ -3,7 +3,6 @@ const express = require("express");
 const path = require("path");
 const http = require("http");
 const WebSocket = require("ws");
-const { v4: uuidv4 } = require("uuid");
 
 // サーバ基盤
 const app = express();
@@ -15,75 +14,72 @@ const wss = new WebSocket.Server({ server });
 // public 配信
 app.use(express.static(path.join(__dirname, "public")));
 
-let players = {};       // id: ws
-let playerOrder = [];   // 接続順（最大2名）
+// プレイヤー管理
+let players = []; // { id: "xxx", ws: WebSocket }
+
+// ランダムID生成
+function createId() {
+  return (
+    Date.now().toString(36) +
+    Math.random().toString(36).substring(2, 8)
+  );
+}
 
 wss.on("connection", (ws) => {
-  const id = uuidv4();   // ★固有ID付与
-  ws.id = id;
+  console.log("Client connected");
 
-  players[id] = ws;
-  playerOrder.push(id);
-
-  console.log("Client connected:", id);
-
-  // ★1人目 or 2人目の状態を通知
-  ws.send(JSON.stringify({
-    type: "connected",
-    playerId: id,
-    index: playerOrder.length   // 1 or 2
-  }));
-
-  // ★2人揃ったら開始
-  if (playerOrder.length === 2) {
-    broadcast({
-      type: "start",
-      msg: "双方接続完了。ゲーム開始！"
-    });
+  // 最大2人まで
+  if (players.length >= 2) {
+    ws.send(
+      JSON.stringify({
+        type: "error",
+        message: "満員のため接続できません。",
+      })
+    );
+    ws.close();
+    return;
   }
 
-  // 受信処理
-  ws.on("message", (msg) => {
-    broadcastExcept(ws.id, msg);
+  // プレイヤーID発行
+  const id = createId();
+  players.push({ id, ws });
+
+  // 自分にIDを送る
+  ws.send(JSON.stringify({ type: "connected", id }));
+
+  // 他のプレイヤーにも「誰が来たか」を通知
+  players.forEach((p) => {
+    if (p.ws !== ws && p.ws.readyState === WebSocket.OPEN) {
+      p.ws.send(JSON.stringify({ type: "join", id }));
+    }
   });
 
-  // 切断処理
+  // メッセージ受信
+  ws.on("message", (msg) => {
+    // 自分以外に送信
+    players.forEach((p) => {
+      if (p.ws !== ws && p.ws.readyState === WebSocket.OPEN) {
+        p.ws.send(msg);
+      }
+    });
+  });
+
+  // 切断時
   ws.on("close", () => {
-    console.log("Client disconnected:", id);
+    console.log("Client disconnected");
 
-    delete players[id];
-    playerOrder = playerOrder.filter(x => x !== id);
+    // 削除
+    players = players.filter((p) => p.ws !== ws);
 
-    broadcast({
-      type: "end",
-      msg: "相手が切断しました"
+    // 相手へ「切断」を通知
+    players.forEach((p) => {
+      if (p.ws.readyState === WebSocket.OPEN) {
+        p.ws.send(JSON.stringify({ type: "leave", id }));
+      }
     });
   });
 });
 
-// 全員に送信
-function broadcast(obj) {
-  const str = typeof obj === "string" ? obj : JSON.stringify(obj);
-  playerOrder.forEach(id => {
-    const ws = players[id];
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(str);
-    }
-  });
-}
-
-// 送信元以外に送信
-function broadcastExcept(senderId, msg) {
-  playerOrder.forEach(id => {
-    if (id !== senderId) {
-      const ws = players[id];
-      if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(msg);
-      }
-    }
-  });
-}
-
-// Render 用ポート
+// Render のポート仕様
 const PORT = process.env.PORT || 8080;
 server.listen(PORT, () => console.log("Server running on " + PORT));
