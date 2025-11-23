@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>バトルフェーズ</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <h2>攻撃ターン</h2>
+    <p id="turnInfo">相手に接続中...</p>
+
+    <div id="battleGrid" class="grid"></div>
+
+    <p id="result"></p>
+
+    <script src="client.js"></script>
+    <script>
+      const size = 5;
+      const battleGrid = document.getElementById("battleGrid");
+
+      // グリッド生成
+      for (let y = 0; y < size; y++) {
+        for (let x = 0; x < size; x++) {
+          const cell = document.createElement("div");
+          cell.classList.add("cell");
+          cell.dataset.x = x;
+          cell.dataset.y = y;
+
+          cell.addEventListener("click", () => {
+            window.attackCell(x, y);
+          });
+
+          battleGrid.appendChild(cell);
+        }
+      }
+    </script>
+  </body>
+</html>

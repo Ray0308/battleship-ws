@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>対戦開始</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <h1>戦艦読み合いゲーム</h1>
+
+    <div id="login">
+      <p>名前を入力してください：</p>
+      <input type="text" id="playerName" placeholder="プレイヤー名" />
+      <button id="startBtn">開始</button>
+    </div>
+
+    <script>
+      document.getElementById("startBtn").onclick = () => {
+        const name = document.getElementById("playerName").value.trim();
+        if (!name) {
+          alert("名前を入力してください");
+          return;
+        }
+        // 名前を保存
+        sessionStorage.setItem("playerName", name);
+        // 準備画面へ遷移
+        window.location.href = "prepare.html";
+      };
+    </script>
+  </body>
+</html>

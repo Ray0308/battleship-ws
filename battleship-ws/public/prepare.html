@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>配置フェーズ</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <h2>船の配置</h2>
+    <p id="nameDisplay"></p>
+
+    <div id="grid" class="grid"></div>
+
+    <button id="confirmBtn">この位置で決定</button>
+
+    <script>
+      // プレイヤー名の表示
+      const name = sessionStorage.getItem("playerName") || "不明なプレイヤー";
+      document.getElementById("nameDisplay").innerText = "あなた: " + name;
+
+      const grid = document.getElementById("grid");
+      const size = 5;
+      let selected = null;
+
+      // グリッド生成
+      for (let y = 0; y < size; y++) {
+        for (let x = 0; x < size; x++) {
+          const cell = document.createElement("div");
+          cell.classList.add("cell");
+          cell.dataset.x = x;
+          cell.dataset.y = y;
+
+          cell.addEventListener("click", () => {
+            selected = { x, y };
+            document
+              .querySelectorAll(".cell")
+              .forEach((c) => c.classList.remove("selected"));
+            cell.classList.add("selected");
+          });
+
+          grid.appendChild(cell);
+        }
+      }
+
+      // 決定ボタン
+      document.getElementById("confirmBtn").onclick = () => {
+        if (!selected) {
+          alert("場所を選んでください");
+          return;
+        }
+
+        // 配置保存
+        sessionStorage.setItem("shipX", selected.x);
+        sessionStorage.setItem("shipY", selected.y);
+
+        // バトル画面へ
+        window.location.href = "battle.html";
+      };
+    </script>
+  </body>
+</html>
