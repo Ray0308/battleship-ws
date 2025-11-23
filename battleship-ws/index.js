@@ -1,64 +1,72 @@
-// 必要モジュール
+
 const express = require("express");
 const path = require("path");
 const http = require("http");
 const WebSocket = require("ws");
 
+// ==============================
 // サーバ基盤
+// ==============================
 const app = express();
 const server = http.createServer(app);
 
-// WebSocketサーバ
+// WebSocket サーバ
 const wss = new WebSocket.Server({ server });
 
 // public 配信
 app.use(express.static(path.join(__dirname, "public")));
 
-// 接続中プレイヤー
-let players = [];
+let players = [];  // { ws, id }
 
-// 接続時
+// ==============================
+// WebSocket 処理
+// ==============================
 wss.on("connection", (ws) => {
-  console.log("Client connected");
 
-  // 新規プレイヤー登録（最大2人）
-  if (players.length < 2) {
-    ws.playerId = players.length + 1; 
-    players.push(ws);
+  console.log("クライアントが接続されました");
 
-    // クライアントへ自分のIDを送る
-    ws.send(JSON.stringify({ type: "playerId", playerId: ws.playerId }));
-  } else {
-    // 3人目以降は切断
-    ws.send(JSON.stringify({ type: "full" }));
-    ws.close();
-    return;
-  }
+  // --- プレイヤーID の割り振り ---
+  const id = (players.length === 0 ? "p1" : "p2");
+  players.push({ ws, id });
 
-  // プレイヤーが2人揃ったら開始通知
+  // クライアントへ プレイヤーID を送信
+  ws.send(JSON.stringify({
+    type: "assign",
+    id
+  }));
+
+  // --- ２人揃ったらゲーム開始 ---
   if (players.length === 2) {
+    console.log("プレイヤーが2人揃いました。対戦開始します");
     players.forEach((p) => {
-      if (p.readyState === WebSocket.OPEN) {
-        p.send(JSON.stringify({ type: "start" }));
-      }
+      p.ws.send(JSON.stringify({ type: "ready" }));
     });
   }
 
-  // メッセージ転送
+  // --- メッセージ受信 ---
   ws.on("message", (msg) => {
     players.forEach((p) => {
-      if (p !== ws && p.readyState === WebSocket.OPEN) {
-        p.send(msg);
+      if (p.ws !== ws && p.ws.readyState === WebSocket.OPEN) {
+        p.ws.send(msg.toString());  // 受け取ったデータを相手へ転送
       }
     });
   });
 
-  // 切断時
+  // --- 切断時 ---
   ws.on("close", () => {
-    players = players.filter((p) => p !== ws);
+    console.log("クライアントが切断されました");
+    players = players.filter((p) => p.ws !== ws);
+    players.forEach((p) => {
+      p.ws.send(JSON.stringify({ type: "disconnect" }));
+    });
   });
 });
 
-// Port設定
+// ==============================
+// Render / ローカル両対応
+// ==============================
 const PORT = process.env.PORT || 8080;
-server.listen(PORT, () => console.log("Server running on " + PORT));
+
+server.listen(PORT, () => {
+  console.log("サーバーは " + PORT + " で起動中");
+});
