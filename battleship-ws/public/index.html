@@ -1,72 +1,31 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>対戦開始</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <h1>戦艦読み合いゲーム</h1>
 
-const express = require("express");
-const path = require("path");
-const http = require("http");
-const WebSocket = require("ws");
+    <div id="login">
+      <p>名前を入力してください：</p>
+      <input type="text" id="playerName" placeholder="プレイヤー名" />
+      <button id="startBtn">開始</button>
+    </div>
 
-// ==============================
-// サーバ基盤
-// ==============================
-const app = express();
-const server = http.createServer(app);
-
-// WebSocket サーバ
-const wss = new WebSocket.Server({ server });
-
-// public 配信
-app.use(express.static(path.join(__dirname, "public")));
-
-let players = [];  // { ws, id }
-
-// ==============================
-// WebSocket 処理
-// ==============================
-wss.on("connection", (ws) => {
-
-  console.log("クライアントが接続されました");
-
-  // --- プレイヤーID の割り振り ---
-  const id = (players.length === 0 ? "p1" : "p2");
-  players.push({ ws, id });
-
-  // クライアントへ プレイヤーID を送信
-  ws.send(JSON.stringify({
-    type: "assign",
-    id
-  }));
-
-  // --- ２人揃ったらゲーム開始 ---
-  if (players.length === 2) {
-    console.log("プレイヤーが2人揃いました。対戦開始します");
-    players.forEach((p) => {
-      p.ws.send(JSON.stringify({ type: "ready" }));
-    });
-  }
-
-  // --- メッセージ受信 ---
-  ws.on("message", (msg) => {
-    players.forEach((p) => {
-      if (p.ws !== ws && p.ws.readyState === WebSocket.OPEN) {
-        p.ws.send(msg.toString());  // 受け取ったデータを相手へ転送
-      }
-    });
-  });
-
-  // --- 切断時 ---
-  ws.on("close", () => {
-    console.log("クライアントが切断されました");
-    players = players.filter((p) => p.ws !== ws);
-    players.forEach((p) => {
-      p.ws.send(JSON.stringify({ type: "disconnect" }));
-    });
-  });
-});
-
-// ==============================
-// Render / ローカル両対応
-// ==============================
-const PORT = process.env.PORT || 8080;
-
-server.listen(PORT, () => {
-  console.log("サーバーは " + PORT + " で起動中");
-});
+    <script>
+      document.getElementById("startBtn").onclick = () => {
+        const name = document.getElementById("playerName").value.trim();
+        if (!name) {
+          alert("名前を入力してください");
+          return;
+        }
+        // 名前を保存
+        sessionStorage.setItem("playerName", name);
+        // 準備画面へ遷移
+        window.location.href = "prepare.html";
+      };
+    </script>
+  </body>
+</html>
