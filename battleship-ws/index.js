@@ -14,72 +14,49 @@ const wss = new WebSocket.Server({ server });
 // public 配信
 app.use(express.static(path.join(__dirname, "public")));
 
-// プレイヤー管理
-let players = []; // { id: "xxx", ws: WebSocket }
-
-// ランダムID生成
-function createId() {
-  return (
-    Date.now().toString(36) +
-    Math.random().toString(36).substring(2, 8)
-  );
-}
+// 最大2人
+let players = [];
 
 wss.on("connection", (ws) => {
   console.log("Client connected");
 
-  // 最大2人まで
+  // 2人以上は入れない
   if (players.length >= 2) {
-    ws.send(
-      JSON.stringify({
-        type: "error",
-        message: "満員のため接続できません。",
-      })
-    );
+    ws.send(JSON.stringify({ type: "full" }));
     ws.close();
     return;
   }
 
-  // プレイヤーID発行
-  const id = createId();
-  players.push({ id, ws });
+  players.push(ws);
 
-  // 自分にIDを送る
-  ws.send(JSON.stringify({ type: "connected", id }));
-
-  // 他のプレイヤーにも「誰が来たか」を通知
+  // 現在の人数を通知（クライアント側の接続判定に使う）
   players.forEach((p) => {
-    if (p.ws !== ws && p.ws.readyState === WebSocket.OPEN) {
-      p.ws.send(JSON.stringify({ type: "join", id }));
+    if (p.readyState === WebSocket.OPEN) {
+      p.send(JSON.stringify({ type: "count", count: players.length }));
     }
   });
 
-  // メッセージ受信
   ws.on("message", (msg) => {
-    // 自分以外に送信
     players.forEach((p) => {
-      if (p.ws !== ws && p.ws.readyState === WebSocket.OPEN) {
-        p.ws.send(msg);
+      if (p !== ws && p.readyState === WebSocket.OPEN) {
+        p.send(msg);
       }
     });
   });
 
-  // 切断時
   ws.on("close", () => {
     console.log("Client disconnected");
+    players = players.filter((p) => p !== ws);
 
-    // 削除
-    players = players.filter((p) => p.ws !== ws);
-
-    // 相手へ「切断」を通知
+    // 人数更新を通知
     players.forEach((p) => {
-      if (p.ws.readyState === WebSocket.OPEN) {
-        p.ws.send(JSON.stringify({ type: "leave", id }));
+      if (p.readyState === WebSocket.OPEN) {
+        p.send(JSON.stringify({ type: "count", count: players.length }));
       }
     });
   });
 });
 
-// Render のポート仕様
+// Render / Codesandbox 用ポート
 const PORT = process.env.PORT || 8080;
 server.listen(PORT, () => console.log("Server running on " + PORT));
